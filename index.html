@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mahi Beauty Pro 4K</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body { margin: 0; background: #000; font-family: 'Segoe UI', Roboto, sans-serif; color: white; overflow: hidden; height: 100vh; }
+        
+        /* कैमरा लेयर */
+        #container { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: #000; }
+        video { width: 100%; height: 100%; object-fit: cover; transition: all 0.4s ease-in-out; }
+
+        /* --- प्रोफेशनल ब्यूटी फिल्टर्स का असली जादू --- */
+        
+        /* 1. Normal: कोई फिल्टर नहीं */
+        .normal { filter: none; }
+
+        /* 2. Summer Mode: गोरा रंग और सनशाइन ग्लो (Pinkish White Tone) */
+        .summer { 
+            filter: brightness(1.25) contrast(1.1) saturate(1.4) sepia(0.05) hue-rotate(-5deg); 
+        }
+
+        /* 3. Apple iOS Mode: नेचुरल वाइब्रेंट कलर्स और हाई शार्पनेस */
+        .apple { 
+            filter: contrast(1.18) brightness(1.12) saturate(1.25) drop-shadow(0 0 1px rgba(255,255,255,0.2));
+        }
+
+        /* 4. Ultra HD Mode: एकदम क्रिस्टल क्लियर, स्मूथ स्किन और ब्राइट फोटो */
+        .ultra-hd { 
+            filter: brightness(1.2) contrast(1.25) saturate(1.1) blur(0px);
+        }
+
+        /* 5. Beauty Plus: स्किन सॉफ्टनिंग और फेस वाइटनिंग */
+        .beauty-plus {
+            filter: brightness(1.3) contrast(1.05) saturate(1.35) sepia(0.02);
+        }
+
+        /* UI डिजाइन */
+        .overlay { position: absolute; bottom: 0; width: 100%; background: linear-gradient(to top, rgba(0,0,0,0.9) 20%, transparent); padding: 30px 0 60px; z-index: 100; }
+        
+        .filter-scroller { display: flex; overflow-x: auto; gap: 20px; padding: 10px 30px; justify-content: flex-start; scrollbar-width: none; }
+        .filter-scroller::-webkit-scrollbar { display: none; }
+
+        .f-item { min-width: 80px; text-align: center; cursor: pointer; opacity: 0.6; transition: 0.3s; }
+        .f-item.active { opacity: 1; transform: scale(1.15); color: #00e5ff; font-weight: bold; }
+        .f-preview { width: 50px; height: 50px; border-radius: 50%; border: 2px solid #fff; margin: 0 auto 8px; background-size: cover; }
+
+        .controls { display: flex; align-items: center; justify-content: space-evenly; margin-top: 30px; }
+        .shutter-circle { width: 80px; height: 80px; border-radius: 50%; border: 4px solid #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; background: rgba(255,255,255,0.1); }
+        .shutter-inner { width: 65px; height: 65px; background: #fff; border-radius: 50%; transition: 0.2s; }
+        .shutter-circle:active .shutter-inner { transform: scale(0.85); background: #ddd; }
+        
+        .icon-btn { font-size: 30px; cursor: pointer; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <video id="v" autoplay playsinline muted></video>
+        
+        <div class="overlay">
+            <div class="filter-scroller">
+                <div class="f-item active" onclick="setF(this, 'normal')">
+                    <div class="f-preview" style="background: #555;"></div>Normal
+                </div>
+                <div class="f-item" onclick="setF(this, 'summer')">
+                    <div class="f-preview" style="background: linear-gradient(45deg, #ff9a9e, #fad0c4);"></div>Summer
+                </div>
+                <div class="f-item" onclick="setF(this, 'apple')">
+                    <div class="f-preview" style="background: linear-gradient(45deg, #a1c4fd, #c2e9fb);"></div>iPhone
+                </div>
+                <div class="f-item" onclick="setF(this, 'ultra-hd')">
+                    <div class="f-preview" style="background: linear-gradient(45deg, #84fab0, #8fd3f4);"></div>4K HD
+                </div>
+                <div class="f-item" onclick="setF(this, 'beauty-plus')">
+                    <div class="f-preview" style="background: linear-gradient(45deg, #fccb90, #d57eeb);"></div>Beauty+
+                </div>
+            </div>
+
+            <div class="controls">
+                <div class="icon-btn" onclick="toggleMode()" id="mode-icon">📸</div>
+                <div class="shutter-circle" onclick="capture()">
+                    <div class="shutter-inner"></div>
+                </div>
+                <div class="icon-btn" onclick="flip()">🔄</div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script>
+        const v = document.getElementById('v');
+        const c = document.getElementById('canvas');
+        let stream, isVideo = false, facing = "user";
+
+        async function init() {
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            try {
+                // 4K Resolution Settings
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: facing, width: {ideal: 3840}, height: {ideal: 2160} },
+                    audio: true 
+                });
+                v.srcObject = stream;
+            } catch (err) { alert("कैमरा एक्सेस नहीं मिला!"); }
+        }
+
+        function setF(el, filter) {
+            document.querySelectorAll('.f-item').forEach(i => i.classList.remove('active'));
+            el.classList.add('active');
+            v.className = filter;
+        }
+
+        function toggleMode() {
+            isVideo = !isVideo;
+            document.getElementById('mode-icon').innerText = isVideo ? "🎥" : "📸";
+            alert(isVideo ? "Video Mode ON" : "Photo Mode ON");
+        }
+
+        function capture() {
+            if (!isVideo) {
+                // फोटो खींचना
+                c.width = v.videoWidth; c.height = v.videoHeight;
+                const ctx = c.getContext('2d');
+                ctx.filter = getComputedStyle(v).filter; // यह लाइन फोटो में ब्यूटी सेव करेगी
+                ctx.drawImage(v, 0, 0);
+                const link = document.createElement('a');
+                link.download = `Mahi_Beauty_${Date.now()}.jpg`;
+                link.href = c.toDataURL('image/jpeg', 1.0);
+                link.click();
+            } else {
+                alert("वीडियो रिकॉर्डिंग के लिए MediaRecorder की ज़रूरत है (कोड लंबा हो जाएगा)");
+            }
+        }
+
+        function flip() { facing = (facing === "user") ? "environment" : "user"; init(); }
+        
+        window.onload = init;
+    </script>
+</body>
+</html>
