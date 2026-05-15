@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MahiCam Ultimate Pro</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background-color: #000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed;
+        }
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        #video-feed { display: none; }
+        
+        /* रेंडरिंग कैनवास - जो पूरी स्क्रीन पर दिखेगा */
+        #view-canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+
+        /* ऑन-क्लिक फ्रंट फ्लैश इफ़ेक्ट */
+        .flash-effect {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #ffffff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .flash-active {
+            animation: appFlash 0.35s ease-out;
+        }
+        @keyframes appFlash {
+            0% { opacity: 1; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* टॉप कंट्रोल्स */
+        .top-controls {
+            position: absolute;
+            top: 30px; left: 0; width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 10;
+        }
+        .btn-icon {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 25px;
+            font-size: 12px;
+            font-weight: bold;
+            backdrop-filter: blur(8px);
+            cursor: pointer;
+        }
+        .btn-icon.flash-on {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+
+        /* 10x ज़ूम UI */
+        .zoom-container {
+            position: absolute;
+            bottom: 190px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 12px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .zoom-slider {
+            width: 100%;
+            accent-color: #fff;
+            cursor: pointer;
+        }
+        .zoom-label {
+            color: #fff;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        /* बॉटम पैनल */
+        .bottom-panel {
+            position: absolute;
+            bottom: 0; left: 0; width: 100%;
+            background: linear-gradient(to top, rgba(0,0,0,1) 30%, transparent);
+            padding: 20px 10px 50px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+            z-index: 10;
+        }
+
+        /* फिल्टर्स कैरोसेल */
+        .filter-carousel {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            width: 100%;
+            padding: 5px 20px;
+            scrollbar-width: none;
+        }
+        .filter-carousel::-webkit-scrollbar { display: none; }
+        .filter-chip {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 13px;
+            white-space: nowrap;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: 0.3s;
+        }
+        .filter-chip.active {
+            background: #fff;
+            color: #000;
+            font-weight: bold;
+        }
+
+        /* शटर एक्शन्स */
+        .shutter-area {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 0 40px;
+        }
+        .mode-toggle {
+            color: #888;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .mode-toggle.active {
+            color: #fff;
+            border-bottom: 2px solid #fff;
+            padding-bottom: 4px;
+        }
+
+        .shutter-btn {
+            width: 85px;
+            height: 85px;
+            border-radius: 50%;
+            border: 6px solid #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            background: none;
+        }
+        .shutter-inside {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            background: #fff;
+            transition: 0.2s;
+        }
+        .shutter-btn.recording .shutter-inside {
+            background: #ff3b30;
+            transform: scale(0.7);
+            border-radius: 12px;
+        }
+        
+        /* टाइमर */
+        .timer {
+            position: absolute;
+            top: 80px; left: 50%;
+            transform: translateX(-50%);
+            color: #ff3b30;
+            font-weight: bold;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+<div class="camera-container">
+    <div class="flash-effect" id="flash-layer"></div>
+
+    <div class="top-controls">
+        <button class="btn-icon" id="btn-flash" onclick="toggleFlash()">⚡ FLASH: OFF</button>
+        <div class="timer" id="vid-timer">00:00</div>
+        <button class="btn-icon" onclick="switchCamera()">🔄 SWITCH</button>
+    </div>
+
+    <video id="video-feed" autoplay playsinline muted></video>
+    <canvas id="view-canvas"></canvas>
+
+    <div class="zoom-container">
+        <input type="range" id="zoom-range" class="zoom-slider" min="1" max="10" step="0.1" value="1" oninput="updateZoom(this.value)">
+        <span class="zoom-label" id="zoom-val">1.0x ZOOM</span>
+    </div>
+
+    <div class="bottom-panel">
+        <div class="filter-carousel">
+            <div class="filter-chip active" id="f-normal" onclick="setFilter('normal')">Original</div>
+            <div class="filter-chip" id="f-beauty" onclick="setFilter('beauty')">✨ Beauty Plus</div>
+            <div class="filter-chip" id="f-summer" onclick="setFilter('summer')">☀️ Summer Mode</div>
+            <div class="filter-chip" id="f-ai" onclick="setFilter('ai')">🤖 AI Glow</div>
+        </div>
+
+        <div class="shutter-area">
+            <span class="mode-toggle active" id="mode-photo" onclick="setCaptureMode('photo')">PHOTO</span>
+            <button class="shutter-btn" id="shutter-trigger" onclick="handleShutter()">
+                <div class="shutter-inside" id="shutter-core"></div>
+            </button>
+            <span class="mode-toggle" id="mode-video" onclick="setCaptureMode('video')">VIDEO</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('video-feed');
+    const canvas = document.getElementById('view-canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const flashLayer = document.getElementById('flash-layer');
+    
+    let currentStream = null;
+    let useFrontCamera = true;
+    let currentFilter = 'normal';
+    let captureMode = 'photo';
+    let isRecording = false;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let zoomLevel = 1.0;
+    let isFlashOn = false;
+    let timerInterval = null;
+
+    async function initCamera() {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+
+        const constraints = {
+            video: {
+                facingMode: useFrontCamera ? "user" : "environment",
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            },
+            audio: true
+        };
+
+        try {
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = currentStream;
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                video.play();
+                requestAnimationFrame(renderLoop);
+            };
+        } catch (err) {
+            alert("Camera Access Error: कृपया कैमरा परमिशन दें और HTTPS इस्तेमाल करें।");
+        }
+    }
+
+    // एडवांस पिक्सल इंजन - यही असली गोरापन और क्लैरिटी देगा
+    function renderLoop() {
+        if (video.paused || video.ended) return;
+
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 10x ज़ूम कैलकुलेशन
+        const w = canvas.width, h = canvas.height;
+        const sw = w / zoomLevel, sh = h / zoomLevel;
+        const sx = (w - sw) / 2, sy = (h - sh) / 2;
+
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+
+        // इमेज प्रोसेसिंग फिल्टर
+        if (currentFilter !== 'normal') {
+            let imgData = ctx.getImageData(0, 0, w, h);
+            let data = imgData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                let r = data[i], g = data[i+1], b = data[i+2];
+
+                if (currentFilter === 'beauty') {
+                    // Whitening (गोरापन) + Glow
+                    data[i] = Math.min(255, r * 1.2 + 25);
+                    data[i+1] = Math.min(255, g * 1.2 + 25);
+                    data[i+2] = Math.min(255, b * 1.25 + 30);
+                } else if (currentFilter === 'summer') {
+                    // Vibrant & Saturated
+                    data[i] = Math.min(255, r * 1.4);
+                    data[i+1] = Math.min(255, g * 1.15);
+                    data[i+2] = Math.min(255, b * 0.8);
+                } else if (currentFilter === 'ai') {
+                    // AI Clarity (धुंध हटाना)
+                    data[i] = Math.min(255, r * 1.1 + 10);
+                    data[i+1] = Math.min(255, g * 1.1 + 10);
+                    data[i+2] = Math.min(255, b * 1.1 + 10);
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+
+            // ब्यूटी मोड के लिए सॉफ्ट स्किन स्मूथिंग ओवरले
+            if (currentFilter === 'beauty') {
+                ctx.globalAlpha = 0.25;
+                ctx.filter = 'blur(4px) contrast(1.1)';
+                ctx.drawImage(canvas, 0, 0);
+                ctx.filter = 'none';
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        ctx.restore();
+        requestAnimationFrame(renderLoop);
+    }
+
+    function updateZoom(val) {
+        zoomLevel = parseFloat(val);
+        document.getElementById('zoom-val').innerText = `${zoomLevel.toFixed(1)}x ZOOM`;
+    }
+
+    function toggleFlash() {
+        isFlashOn = !isFlashOn;
+        const btn = document.getElementById('btn-flash');
+        btn.innerText = isFlashOn ? "⚡ FLASH: ON" : "⚡ FLASH: OFF";
+        btn.classList.toggle('flash-on', isFlashOn);
+    }
+
+    function switchCamera() {
+        useFrontCamera = !useFrontCamera;
+        initCamera();
+    }
+
+    function setFilter(f) {
+        currentFilter = f;
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        document.getElementById(`f-${f}`).classList.add('active');
+    }
+
+    function setCaptureMode(m) {
+        if(isRecording) return;
+        captureMode = m;
+        document.getElementById('mode-photo').classList.toggle('active', m === 'photo');
+        document.getElementById('mode-video').classList.toggle('active', m === 'video');
+        document.getElementById('shutter-core').style.background = m === 'video' ? '#ff3b30' : '#fff';
+    }
+
+    function handleShutter() {
+        if (captureMode === 'photo') takePhoto();
+        else {
+            if (!isRecording) startRecording();
+            else stopRecording();
+        }
+    }
+
+    // ऑटो-सेव फोटोग्राफी
+    function takePhoto() {
+        if (isFlashOn) {
+            flashLayer.classList.add('flash-active');
+            setTimeout(() => flashLayer.classList.remove('flash-active'), 350);
+        }
+
+        setTimeout(() => {
+            const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+            const link = document.createElement('a');
+            link.download = `MahiCam_${Date.now()}.jpg`;
+            link.href = dataUrl;
+            link.click(); // ऑटो सेव
+        }, isFlashOn ? 150 : 0);
+    }
+
+    // वीडियो रिकॉर्डिंग
+    function startRecording() {
+        isRecording = true;
+        recordedChunks = [];
+        document.getElementById('shutter-trigger').classList.add('recording');
+        
+        const canvasStream = canvas.captureStream(30);
+        if (currentStream && currentStream.getAudioTracks().length > 0) {
+            canvasStream.addTrack(currentStream.getAudioTracks()[0].clone());
+        }
+
+        mediaRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm;codecs=vp9' });
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const link = document.createElement('a');
+            link.download = `MahiCam_Vid_${Date.now()}.webm`;
+            link.href = URL.createObjectURL(blob);
+            link.click(); // ऑटो सेव
+        };
+
+        mediaRecorder.start();
+        startTimer();
+    }
+
+    function stopRecording() {
+        isRecording = false;
+        document.getElementById('shutter-trigger').classList.remove('recording');
+        mediaRecorder.stop();
+        stopTimer();
+    }
+
+    function startTimer() {
+        const timerEl = document.getElementById('vid-timer');
+        timerEl.style.display = 'block';
+        let seconds = 0;
+        timerInterval = setInterval(() => {
+            seconds++;
+            let m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            let s = (seconds % 60).toString().padStart(2, '0');
+            timerEl.innerText = `${m}:${s}`;
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+        document.getElementById('vid-timer').style.display = 'none';
+    }
+
+    window.onload = initCamera;
+</script>
+
+</body>
+</html>
