@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mahi Pro DSLR</title>
+    <style>
+        body { margin: 0; background: #000; font-family: sans-serif; overflow: hidden; height: 100vh; touch-action: none; }
+        #camera-view { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        
+        video { 
+            width: 100%; height: 100%; object-fit: cover; 
+            image-rendering: optimizeQuality;
+        }
+
+        /* असली इंस्टाग्राम फिल्टर्स */
+        .normal { filter: none; }
+        .beauty { filter: brightness(1.3) contrast(1.1) saturate(1.35) sepia(0.03); }
+        .summer { filter: brightness(1.2) contrast(1.2) saturate(1.6) hue-rotate(-2deg); }
+        .ai-mode { filter: contrast(1.3) brightness(1.15) saturate(1.25); }
+
+        /* UI Overlays */
+        .top-bar { position: absolute; top: 15px; width: 100%; display: flex; justify-content: space-between; padding: 0 25px; z-index: 100; box-sizing: border-box; }
+        .zoom-info { position: absolute; top: 80px; width: 100%; text-align: center; color: #ffcc00; font-weight: bold; z-index: 100; text-shadow: 0 0 5px #000; }
+
+        .bottom-ui { position: absolute; bottom: 0; width: 100%; background: linear-gradient(transparent, rgba(0,0,0,0.9)); padding: 30px 0 60px; z-index: 100; }
+        
+        .mode-strip { display: flex; overflow-x: auto; gap: 20px; padding: 10px 40px; justify-content: flex-start; scrollbar-width: none; margin-bottom: 25px; }
+        .m-item { min-width: 90px; text-align: center; color: #fff; font-size: 11px; opacity: 0.5; transition: 0.3s; cursor: pointer; text-transform: uppercase; font-weight: bold; }
+        .m-item.active { opacity: 1; color: #00f2ff; transform: scale(1.1); }
+
+        .shutter-row { display: flex; align-items: center; justify-content: space-evenly; }
+        #thumb-view { width: 55px; height: 55px; border-radius: 8px; border: 2px solid #fff; background-size: cover; background-position: center; background-color: #222; cursor: pointer; }
+        
+        .shutter-btn { width: 85px; height: 85px; border-radius: 50%; border: 4px solid #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .shutter-in { width: 68px; height: 68px; background: #fff; border-radius: 50%; transition: 0.15s; }
+        .shutter-btn:active .shutter-in { transform: scale(0.8); }
+
+        .ico { font-size: 30px; color: white; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="camera-view" ontouchstart="tS(event)" ontouchmove="tM(event)">
+        <video id="v" autoplay playsinline muted></video>
+        
+        <div class="top-bar">
+            <div class="ico" id="f-btn" onclick="toggleF()">⚡ OFF</div>
+            <div class="ico" onclick="flip()">🔄</div>
+        </div>
+
+        <div class="zoom-info" id="z-txt">1.0x</div>
+
+        <div class="bottom-ui">
+            <div class="mode-strip">
+                <div class="m-item active" onclick="setM(this, 'normal')">Original</div>
+                <div class="m-item" onclick="setM(this, 'beauty')">Beauty+</div>
+                <div class="m-item" onclick="setM(this, 'summer')">Summer</div>
+                <div class="m-item" onclick="setM(this, 'ai-mode')">AI DSLR</div>
+            </div>
+
+            <div class="shutter-row">
+                <div id="thumb-view" onclick="openFull()"></div>
+                <div class="shutter-btn" onclick="takePic()">
+                    <div class="shutter-in"></div>
+                </div>
+                <div style="width: 50px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="c" style="display:none;"></canvas>
+
+    <script>
+        const v = document.getElementById('v');
+        const c = document.getElementById('c');
+        const thumb = document.getElementById('thumb-view');
+        let stream, facing = "user", flash = "off", zoom = 1, d0 = 0, lastPhoto = null;
+
+        async function start() {
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: facing, width: {ideal: 3840}, height: {ideal: 2160} } 
+                });
+                v.srcObject = stream;
+            } catch (e) { console.log(e); }
+        }
+
+        // --- जूमिंग (No Refresh) ---
+        function tS(e) { if (e.touches.length === 2) d0 = 0; }
+        function tM(e) {
+            if (e.touches.length === 2) {
+                let d = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                if (d0 === 0) d0 = d;
+                else {
+                    let s = d / d0;
+                    zoom = Math.min(Math.max(1, zoom * s), 10);
+                    v.style.transform = `scale(${zoom})`;
+                    document.getElementById('z-txt').innerText = zoom.toFixed(1) + "x";
+                    d0 = d;
+                }
+            }
+        }
+
+        function toggleF() {
+            flash = (flash === "off") ? "on" : "off";
+            const b = document.getElementById('f-btn');
+            b.innerText = (flash === "on") ? "⚡ ON" : "⚡ OFF";
+            b.style.color = (flash === "on") ? "#ffcc00" : "#fff";
+        }
+
+        function setM(el, f) {
+            document.querySelectorAll('.m-item').forEach(m => m.classList.remove('active'));
+            el.classList.add('active');
+            v.className = f;
+        }
+
+        async function takePic() {
+            const track = stream.getVideoTracks()[0];
+            if (flash === "on" && facing === "environment") {
+                await track.applyConstraints({ advanced: [{ torch: true }] });
+            }
+
+            setTimeout(async () => {
+                c.width = v.videoWidth; c.height = v.videoHeight;
+                const ctx = c.getContext('2d');
+                ctx.filter = getComputedStyle(v).filter;
+                
+                // Zoom capture logic
+                const sw = v.videoWidth / zoom;
+                const sh = v.videoHeight / zoom;
+                const sx = (v.videoWidth - sw) / 2;
+                const sy = (v.videoHeight - sh) / 2;
+                ctx.drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+
+                if (flash === "on" && facing === "environment") {
+                    await track.applyConstraints({ advanced: [{ torch: false }] });
+                }
+
+                // फोटो को सिर्फ ऐप के अंदर सेव करना (ताकि क्रैश न हो)
+                lastPhoto = c.toDataURL('image/jpeg', 0.9);
+                thumb.style.backgroundImage = `url(${lastPhoto})`;
+                
+                // डाउनलोड को बैकग्राउंड में रखना
+                const l = document.createElement('a');
+                l.href = lastPhoto;
+                l.download = `Mahi_${Date.now()}.jpg`;
+                l.click(); 
+            }, 100);
+        }
+
+        function openFull() {
+            if (lastPhoto) {
+                const w = window.open("");
+                w.document.write(`<img src="${lastPhoto}" style="width:100%; height:auto;">`);
+            }
+        }
+
+        function flip() { facing = (facing === "user") ? "environment" : "user"; start(); }
+        window.onload = start;
+    </script>
+</body>
+</html>
