@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mahi Insta Real-Filter Cam & Chat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --insta-pink: #d62976;
+            --insta-purple: #962fbf;
+            --dark-bg: #0b0b12;
+            --card-glass: rgba(255, 255, 255, 0.08);
+        }
+
+        html, body {
+            overscroll-behavior: contain;
+            font-family: 'Poppins', sans-serif;
+            margin: 0; padding: 0;
+            background: var(--dark-bg);
+            color: #fff; height: 100%; overflow: hidden;
+        }
+
+        .app-container {
+            display: flex; flex-direction: column; height: 100vh;
+            max-width: 480px; margin: 0 auto; background: #12121c;
+            position: relative; box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        header {
+            background: linear-gradient(45deg, var(--insta-pink), var(--insta-purple));
+            padding: 15px; text-align: center; font-weight: 600; font-size: 18px;
+        }
+
+        .main-nav { display: flex; background: #1a1a26; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-btn {
+            flex: 1; background: none; border: none; color: #aaa;
+            padding: 12px 0; font-weight: 600; font-size: 14px; cursor: pointer; text-align: center;
+        }
+        .nav-btn.active { color: #fff; border-bottom: 3px solid var(--insta-pink); }
+
+        .app-section { flex: 1; display: none; padding: 15px; overflow-y: auto; box-sizing: border-box; }
+        .app-section.active { display: flex; flex-direction: column; }
+
+        .glass-box { background: var(--card-glass); border: 1px solid rgba(255,255,255,0.1); padding: 20px; border-radius: 16px; }
+        input[type="email"], input[type="text"] {
+            width: 100%; padding: 14px; background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; color: #fff;
+        }
+
+        .primary-btn {
+            background: linear-gradient(45deg, var(--insta-pink), var(--insta-purple));
+            color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px;
+        }
+
+        /* Filter Selector Buttons */
+        .filter-shelf {
+            display: flex; gap: 8px; margin-top: 12px; overflow-x: auto; padding-bottom: 5px;
+        }
+        .filter-chip {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; white-space: nowrap;
+        }
+        .filter-chip.selected {
+            background: linear-gradient(45deg, var(--insta-pink), #ff4081); border-color: #fff;
+        }
+
+        .user-list { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .user-item { background: rgba(255,255,255,0.05); padding: 12px 15px; border-radius: 10px; cursor: pointer; border-left: 4px solid var(--insta-pink); }
+
+        /* Camera Viewport Canvas Layout */
+        .camera-wrapper {
+            position: relative; width: 100%; border-radius: 16px; overflow: hidden; background: #000; aspect-ratio: 3/4;
+        }
+        video { display: none; } /* Hidden raw video */
+        canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+        .chat-area {
+            flex: 1; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 15px; overflow-y: auto; margin-bottom: 15px; display: flex; flex-direction: column;
+        }
+        .msg { margin-bottom: 10px; padding: 10px 14px; border-radius: 14px; max-width: 75%; font-size: 14px; }
+        .msg.me { background: linear-gradient(45deg, var(--insta-pink), var(--insta-purple)); color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg.peer { background: #262636; color: #fff; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .chat-bar { display: flex; gap: 10px; }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+
+<div class="app-container">
+    <header>MAHI LIVE APP ENGINE</header>
+    
+    <nav class="main-nav">
+        <button class="nav-btn active" id="tab-login" onclick="switchTab('login')">🔑 Login</button>
+        <button class="nav-btn" id="tab-chat" onclick="switchTab('chat')">💬 Chats</button>
+        <button class="nav-btn" id="tab-cam" onclick="switchTab('cam')">📸 Insta Cam</button>
+    </nav>
+
+    <section id="sec-login" class="app-section active">
+        <div class="glass-box">
+            <h3 style="margin-top:0; color:var(--insta-pink);">Identity Registry</h3>
+            <input type="email" id="myEmail" placeholder="Enter Your Email to Login">
+            <button class="primary-btn" onclick="loginUser()">Login</button>
+        </div>
+        <div style="margin-top: 20px;">
+            <h4 style="margin: 0 0 10px 0; font-size: 14px; color: var(--insta-pink);">Select Active Node to Chat:</h4>
+            <div class="user-list" id="usersContainer"></div>
+        </div>
+    </section>
+
+    <section id="sec-chat" class="app-section">
+        <div style="font-size: 12px; color: #aaa; margin-bottom: 8px;" id="currentChattingWith">Select a user first</div>
+        <div class="chat-area" id="chatBox"></div>
+        <div class="chat-bar">
+            <input type="text" id="chatInput" placeholder="Type message...">
+            <button class="primary-btn" style="width:auto; margin:0; padding:0 20px;" onclick="sendLiveMessage()">Send</button>
+        </div>
+    </section>
+
+    <section id="sec-cam" class="app-section">
+        <div class="camera-wrapper">
+            <video id="rawWebcam" autoplay playsinline></video>
+            <canvas id="filterCanvas"></canvas> </div>
+        
+        <div class="filter-shelf">
+            <button class="filter-chip selected" id="f-normal" onclick="setFilterMode('normal')">Original Raw</button>
+            <button class="filter-chip" id="f-beauty" onclick="setFilterMode('beauty')">🌸 Beauty Plus</button>
+            <button class="filter-chip" id="f-summer" onclick="setFilterMode('summer')">☀️ Summer Gold</button>
+            <button class="filter-chip" id="f-nature" onclick="setFilterMode('nature')">🍃 Nature Fresh</button>
+        </div>
+    </section>
+</div>
+
+<script>
+    let myId = localStorage.getItem('myId') || "";
+    let peerId = "", dbRoomPath = "", database = null, cameraStream = null, filterMode = "normal";
+    let canvasElement = document.getElementById('filterCanvas');
+    let ctx = canvasElement.getContext('2d');
+    let animationLoopId = null;
+
+    const fbConfig = { databaseURL: "https://mahi-encyclopedia-default-rtdb.firebaseio.com" };
+    try { firebase.initializeApp(fbConfig); database = firebase.database(); } catch(e){}
+
+    if(myId) { document.getElementById('myEmail').value = myId; loginUser(); }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.app-section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`sec-${tabName}`).classList.add('active');
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+
+        if(tabName === 'cam') { startFilteringEngine(); } else { stopFilteringEngine(); }
+        if(tabName === 'chat') { syncChatEngine(); }
+    }
+
+    function loginUser() {
+        const email = document.getElementById('myEmail').value.trim().toLowerCase();
+        if(!email) return;
+        myId = email; localStorage.setItem('myId', myId);
+        if(database) {
+            database.ref(`users/${myId.replace(/[^a-zA-Z0-9]/g, "")}`).set({ email: myId, status: "online" });
+        }
+        listenForUsers();
+    }
+
+    function listenForUsers() {
+        if(!database) return;
+        database.ref('users').on('value', (snap) => {
+            const container = document.getElementById('usersContainer');
+            container.innerHTML = '';
+            snap.forEach((child) => {
+                const u = child.val();
+                if(u.email !== myId) {
+                    container.innerHTML += `<div class="user-item" onclick="startChatWith('${u.email}')">🟢 ${u.email}</div>`;
+                }
+            });
+        });
+    }
+
+    function startChatWith(p) {
+        peerId = p; document.getElementById('currentChattingWith').innerText = `Chatting with: ${peerId}`;
+        const cMy = myId.replace(/[^a-zA-Z0-9]/g, ""), cP = peerId.replace(/[^a-zA-Z0-9]/g, "");
+        dbRoomPath = cMy < cP ? `${cMy}_${cP}` : `${cP}_${cMy}`;
+        switchTab('chat');
+    }
+
+    function sendLiveMessage() {
+        const inp = document.getElementById('chatInput'); if(!inp.value.trim() || !database) return;
+        database.ref(`rooms/${dbRoomPath}`).push({ sender: myId, msg: inp.value.trim() });
+        inp.value = '';
+    }
+
+    function syncChatEngine() {
+        if(!database || !dbRoomPath) return;
+        database.ref(`rooms/${dbRoomPath}`).off();
+        database.ref(`rooms/${dbRoomPath}`).on('value', (snap) => {
+            const box = document.getElementById('chatBox'); box.innerHTML = '';
+            snap.forEach((c) => {
+                const d = c.val();
+                box.innerHTML += `<div class="msg ${d.sender === myId ? 'me' : 'peer'}">${d.msg}</div>`;
+            });
+            box.scrollTop = box.scrollHeight;
+        });
+    }
+
+    // --- HEAVY PIXEL-LEVEL FILTER PROCESSSOR ENGINE ---
+    function startFilteringEngine() {
+        const video = document.getElementById('rawWebcam');
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+            .then(stream => {
+                cameraStream = stream; video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    canvasElement.width = 480; canvasElement.height = 640;
+                    renderFilterFrame();
+                };
+            });
+        }
+    }
+
+    function stopFilteringEngine() {
+        if(cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+        if(animationLoopId) cancelAnimationFrame(animationLoopId);
+    }
+
+    function setFilterMode(mode) {
+        filterMode = mode;
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('selected'));
+        document.getElementById(`f-${mode}`).classList.add('selected');
+    }
+
+    function renderFilterFrame() {
+        const video = document.getElementById('rawWebcam');
+        if (video.paused || video.ended) return;
+
+        // Draw current raw hardware frame onto processing layer
+        ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+
+        // Fetch direct pixel byte arrays for deep color injection
+        let frameData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        let pixels = frameData.data;
+
+        for (let i = 0; i < pixels.length; i += 4) {
+            let r = pixels[i];
+            let g = pixels[i + 1];
+            let b = pixels[i + 2];
+
+            if (filterMode === "beauty") {
+                // Beauty Mode: Boosts white channels smoothly and blends soft pink undertones onto skin regions
+                pixels[i]     = Math.min(255, r * 1.15 + 15); // Warm pink tone accentuation
+                pixels[i + 1] = Math.min(255, g * 1.08 + 10); // Subtle contrast balancing
+                pixels[i + 2] = Math.min(255, b * 1.05);       
+            } 
+            else if (filterMode === "summer") {
+                // Summer Gold Filter: Infuses dynamic orange-yellow illumination matrices matrix
+                pixels[i]     = Math.min(255, r * 1.25);
+                pixels[i + 1] = Math.min(255, g * 1.12);
+                pixels[i + 2] = Math.min(255, b * 0.85); // Suppresses cold blue hues
+            } 
+            else if (filterMode === "nature") {
+                // Nature Fresh: Enhances outdoor foliage and background freshness matrices
+                pixels[i]     = Math.min(255, r * 0.90); 
+                pixels[i + 1] = Math.min(255, g * 1.30); // Vibrant Green Boost
+                pixels[i + 2] = Math.min(255, b * 1.15); // Clean Sky Blue Boost
+            }
+        }
+
+        // Project modified aesthetic pixels onto the active view layer instantly
+        ctx.putImageData(frameData, 0, 0);
+        animationLoopId = requestAnimationFrame(renderFilterFrame);
+    }
+</script>
+</body>
+</html>
